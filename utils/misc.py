@@ -204,11 +204,11 @@ def get_tenant_id(api_session, host):
     """
 
     Args:
-        api_session:
-        host:
+        api_session: Valid api session
+        host: Str: The smc ip address
 
     Returns:
-
+        smc_tenant_id: Int: Valid smc_tenant_id
     """
     # Get the list of tenants (domains) from the SMC
     ip_ver = ipaddress.ip_address(host)
@@ -230,8 +230,8 @@ def get_tenant_id(api_session, host):
         return smc_tenant_id
 
     # If unable to fetch list of tenants (domains)
-    else:  # TODO raise exception
-        print("An error has occurred, while fetching tenants (domains), with the following code {}".format(
+    else:
+        raise Exception("An error has occurred, while fetching tenants (domains), with the following code {}".format(
             response.status_code))
 
 
@@ -239,11 +239,11 @@ def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
     """
 
     Args:
-        api_session:
-        smc_host:
-        smc_tenant_id:
-        tag_id:
-        ip_range:
+        api_session: Valid api session
+        smc_host: String: smc host address
+        smc_tenant_id:Int: Tenant id fetched for the authentic connection
+        tag_id: Int: Tag id for the host groups
+        ip_range:List: List of ip addresses in the result dictionary for each host group
 
     Returns:
 
@@ -288,7 +288,6 @@ def post_tag_details(result: Dict):
     Returns:
 
     """
-    # return #TODO needs to be tested in cisco n/w
     # Set the URL for SMC login
     ip_ver = ipaddress.ip_address(result["smc_ip_address"])
     if ip_ver.version == 4:
