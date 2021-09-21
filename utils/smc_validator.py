@@ -49,7 +49,7 @@ class Smc(BaseModel):
     DOMAIN_CONTROLLER: Optional[List[str]]
     EMAIL_SERVERS: Optional[List[str]]
     CRITICAL_RANGE: Optional[List[str]]
-    ENDUSER_RANGE: str
+    ENDUSER_RANGE: List[str]
     smc_ip_address: Optional[str]
     username: Optional[str]
     password: Optional[str]

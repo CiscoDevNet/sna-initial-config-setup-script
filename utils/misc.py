@@ -30,9 +30,11 @@ from typing import Dict
 
 import requests
 from requests import HTTPError
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 from .smc_validator import Smc
 
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 smc_path = str(pathlib.Path.home())
 mapping = {"NAT_GATEWAY": 51, "PUBLIC_RANGE": 65534, "ENDUSER_RANGE": 50076, "INTERNAL_DNS": 27, "EXTERNAL_DNS": 65532,
            "DHCP_SERVER": 36, "DOMAIN_CONTROLLER": 38, "EMAIL_SERVERS": 30, "CRITICAL_RANGE": 10}
@@ -181,28 +183,21 @@ def post_settings(result: dict):
                     ipaddress.ip_address(smc_ip)
                     is_answer = True
                     result["smc_ip_address"] = smc_ip
-                except Exception as error:
-                    logging.error(error)
-                    print(f'{Style.RED}Please enter the ip in the correct format {Style.RESET}')
-            else:
-                is_answer = True
-
-        is_answer = False
-        while not is_answer:
-            post_values = case_check(input("Would you to post the setting to smc now? y or n ? \n"))
-            if post_values in ['y', 'n']:
-                is_answer = True
-                if post_values == 'y':
                     username = input("Enter the Username:")
                     password = getpass.getpass("Enter the Password:")
                     result["username"] = username
                     result["password"] = password
-
+                except Exception as error:
+                    logging.error(error)
+                    print(f'{Style.RED}Please enter the ip in the correct format {Style.RESET}')
+                try:
                     post_tag_details(result)
-                else:
-                    print('Thank you!')
+                except Exception as error:
+                    logging.error(error)
+                    print(f'{Style.RED}Please check the api parameters for smc updation {Style.RESET}')
             else:
-                print(f'{Style.RED}Wrong value! Please input y or n{Style.RESET}')
+                is_answer = True
+                print(f'Thank you for executing the script')
 
 
 def get_tenant_id(api_session, host):
@@ -216,7 +211,11 @@ def get_tenant_id(api_session, host):
 
     """
     # Get the list of tenants (domains) from the SMC
-    url = 'https://[' + host + ']/sw-reporting/v1/tenants/'
+    ip_ver = ipaddress.ip_address(host)
+    if ip_ver.version == 4:
+        url = 'https://' + host + '/sw-reporting/v1/tenants/'
+    elif ip_ver.version == 6:
+        url = 'https://[' + host + ']/sw-reporting/v1/tenants/'
     response = api_session.request("GET", url, verify=False)
 
     # If successfully able to get list of tenants (domains)
@@ -250,22 +249,32 @@ def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
 
     """
     # Get the details of a given tag (host group) from the SMC
-    url = 'https://[' + smc_host + ']/smc-configuration/rest/v1/tenants/' + smc_tenant_id + '/tags/' + tag_id
+    ip_ver = ipaddress.ip_address(smc_host)
+    if ip_ver.version == 4:
+        url = 'https://' + smc_host + '/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/' + str(tag_id)
+    elif ip_ver.version == 6:
+        url = 'https://[' + smc_host + ']/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/' + str(tag_id)
     response = api_session.request("GET", url, verify=False)
     tag_details = json.loads(response.content)["data"]
 
     # Modify the details of thee given tag (host group) from the SMC
-    tag_details['ranges'].extend(ip_range)
+    if isinstance(ip_range,str):
+        ip_range = ip_range.split(' ')
+    if ip_range is not None:
+        tag_details['ranges'].extend(ip_range)
 
     # Update the details of thee given tag (host group) in the SMC
     request_headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
     response = api_session.request("PUT", url, verify=False, data=json.dumps(tag_details), headers=request_headers)
     # If successfully able to update the tag (host group)
-    if (response.status_code == 200) and ip_range in json.loads(response.content)["data"]["ranges"]:
-        print(f"New IP successfully added to this tag (host group)")
+    if response.status_code == 200:
+        matches = [item for item in ip_range if item in json.loads(response.content)["data"]["ranges"]]
+        if ip_range is not None and matches:
+            print(f"New IP successfully added to this tag {tag_id}")
 
     # If unable to update the IPs for a given tag (host group)
     else:
+        print('Response: ', response.content)
         raise Exception("An error has ocurred, while updating tags (host groups), with the following code {}".format(
             response.status_code))
 
@@ -281,8 +290,11 @@ def post_tag_details(result: Dict):
     """
     # return #TODO needs to be tested in cisco n/w
     # Set the URL for SMC login
-    url = "https://[" + result["smc_ip_address"] + "]/token/v2/authenticate"
-
+    ip_ver = ipaddress.ip_address(result["smc_ip_address"])
+    if ip_ver.version == 4:
+        url = "https://" + result["smc_ip_address"] + "/token/v2/authenticate"
+    elif ip_ver.version == 6:
+        url = "https://[" + result["smc_ip_address"] + "]/token/v2/authenticate"
     # Let's create the login request data
     login_request_data = {
         "username": result['username'],
@@ -296,22 +308,25 @@ def post_tag_details(result: Dict):
         response = api_session.request("POST", url, verify=False, data=login_request_data)
         # If the login was successful
         if response.status_code == 200:
+            print(f'Successful logging to smc')
             # Set XSRF token for future requests
+            cookie_flag = False
             for cookie in response.cookies:
                 if cookie.name == 'XSRF-TOKEN':
+                    cookie_flag = True
                     api_session.headers.update({'X-XSRF-TOKEN': cookie.value})
                     tenant_id = get_tenant_id(api_session, result["smc_ip_address"])  # get a tenant id
                     for key, value in result.items():
                         if key in mapping:  # if the result dict have matching tag id we will proceed to update the tag
                             update_tag(api_session, result["smc_ip_address"], tenant_id, mapping[key], value)
                         else:
-                            logging.error(f"{key} is missing from the mapping")
+                            logging.info(f"{key} is not in the host group mapping")
                     with open(file_path, "w") as f:
                         f.write("1")  # to indicate we already posted smc.settings
-                else:
-                    raise HTTPError('XSRF-TOKEN is missing in cookie')
+            if not cookie_flag:
+                raise HTTPError('XSRF-TOKEN is missing in cookie')
         else:
-            raise HTTPError(f"api called with status code {response.status_code}")
+            raise HTTPError(f"api returned with status code {response.status_code}")
     finally:
         if api_session:
             api_session.close()
@@ -454,7 +469,7 @@ def cidr_ip_validation(reference: str, user_input: str, result: dict, is_interna
             if valid_mask != 'n':
                 is_internal = True
                 if reference in ['ENDUSER_RANGE']:
-                    result['ENDUSER_RANGE'] = stripped_list[0]
+                    result['ENDUSER_RANGE'] = stripped_list
                 elif reference in ['ADDITIONAL PUBLIC_RANGE']:
                     result['PUBLIC_RANGE'].extend(stripped_list)
                 elif reference in ['PUBLIC_RANGE']:
