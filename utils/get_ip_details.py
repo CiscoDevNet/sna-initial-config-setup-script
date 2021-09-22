@@ -52,7 +52,7 @@ def get_public_ips(result: dict):
     logging.info('[%s] - API calls to retrieve public IP address.', datetime.datetime.today())
     print(f'{Style.GREEN}Gathering your public IP from http://diagnostic.opendns.com/myip{Style.RESET}')
     try:
-        response = requests.get(url="http://diagnostic.opendns.com/myip")
+        response = requests.get(url="http://diagnostic.opendns.com/myip",verify=False)
         external_ip = response.content.decode('utf-8', '')
         external_ip_list = list()
         external_ip_list.append(external_ip)

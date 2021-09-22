@@ -197,7 +197,7 @@ def post_settings(result: dict):
                     print(f'{Style.RED}Please check the api parameters for smc updation {Style.RESET}')
             else:
                 is_answer = True
-                print(f'Thank you for executing the script')
+                print(f'{Style.GREEN}Thank you for executing the script{Style.RESET}')
 
 
 def get_tenant_id(api_session, host):
@@ -226,7 +226,7 @@ def get_tenant_id(api_session, host):
         smc_tenant_id = tenant_list[0]["id"]
 
         # Print the SMC Tenant ID
-        print("Tenant ID = {}".format(smc_tenant_id))
+        print(f'{Style.GREEN}Tenant ID connected to is : {Style.YELLOW} {smc_tenant_id}{Style.RESET}')
         return smc_tenant_id
 
     # If unable to fetch list of tenants (domains)
@@ -262,6 +262,7 @@ def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
         ip_range = ip_range.split(' ')
     if ip_range is not None:
         tag_details['ranges'].extend(ip_range)
+        tag_details['ranges'] = list(set(tag_details['ranges']))
 
     # Update the details of thee given tag (host group) in the SMC
     request_headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
@@ -270,7 +271,7 @@ def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
     if response.status_code == 200:
         matches = [item for item in ip_range if item in json.loads(response.content)["data"]["ranges"]]
         if ip_range is not None and matches:
-            print(f"New IP successfully added to this tag {tag_id}")
+            print(f"{Style.GREEN}IP address/range successfully added to the tag: {Style.YELLOW}{tag_id}{Style.RESET}")
 
     # If unable to update the IPs for a given tag (host group)
     else:
@@ -307,22 +308,18 @@ def post_tag_details(result: Dict):
         response = api_session.request("POST", url, verify=False, data=login_request_data)
         # If the login was successful
         if response.status_code == 200:
-            print(f'Successful logging to smc')
+            print(f'{Style.GREEN}Successful logging to smc server{Style.RESET}')
             # Set XSRF token for future requests
-            cookie_flag = False
-            for cookie in response.cookies:
-                if cookie.name == 'XSRF-TOKEN':
-                    cookie_flag = True
-                    api_session.headers.update({'X-XSRF-TOKEN': cookie.value})
-                    tenant_id = get_tenant_id(api_session, result["smc_ip_address"])  # get a tenant id
-                    for key, value in result.items():
-                        if key in mapping:  # if the result dict have matching tag id we will proceed to update the tag
-                            update_tag(api_session, result["smc_ip_address"], tenant_id, mapping[key], value)
-                        else:
-                            logging.info(f"{key} is not in the host group mapping")
-                    with open(file_path, "w") as f:
-                        f.write("1")  # to indicate we already posted smc.settings
-            if not cookie_flag:
+            if response.cookies.get('XSRF-TOKEN') is not None:
+                api_session.headers.update({'X-XSRF-TOKEN': response.cookies.get('XSRF-TOKEN')})
+                tenant_id = get_tenant_id(api_session, result["smc_ip_address"])  # get a tenant id
+                for key, value in result.items():
+                    if key in mapping:  # if the result dict have matching tag id we will proceed to update the tag
+                        update_tag(api_session, result["smc_ip_address"], tenant_id, mapping[key], value)
+                    # Any new host group introduced should be added to the mapping dictionary
+                with open(file_path, "w") as f:
+                    f.write("1")  # to indicate we already posted smc.settings
+            else:
                 raise HTTPError('XSRF-TOKEN is missing in cookie')
         else:
             raise HTTPError(f"api returned with status code {response.status_code}")
@@ -530,8 +527,10 @@ def edit_smc_settings(result):
             if edit_field in (list(nums)):
 
                 host_index = int(edit_field) - 1
-                print(f'{Style.GREEN} You have chosen to edit {Style.CYAN}{edit_field}:\t{host_groups.get(host_index)}'
+                print(f'{Style.GREEN}You have chosen to edit {Style.CYAN}{edit_field}:\t{host_groups.get(host_index)}'
                       f'{Style.RESET}')
+                print(f'{Style.YELLOW}Warning: Please note the edit option will replace the current values with '
+                      f'updated values and not append to the end{Style.RESET}')
                 if host_groups.get(host_index) == 'PUBLIC_RANGE' or host_groups.get(host_index) == 'ENDUSER_RANGE':
                     get_input_cidr(host_index, host_groups, result)
                 else:
