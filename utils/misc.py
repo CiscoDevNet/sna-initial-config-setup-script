@@ -196,7 +196,7 @@ def post_settings(result: dict):
                         post_tag_details(result)
                     except Exception as error:
                         logging.error(error)
-                        print(f'{Style.RED}Please check the api parameters and execute script again to post to smc {Style.RESET}')
+                        print(f'{Style.RED}Please check the api parameters/data and execute script again to post to smc {Style.RESET}')
             else:
                 is_answer = True
                 print(f'{Style.GREEN}Thank you for executing the script. Please execute again to post to smc{Style.RESET}')
@@ -257,17 +257,27 @@ def get_tag_append(api_session, smc_host, smc_tenant_id, tag_id, ip_range, coll_
         url = 'https://' + smc_host + '/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/' + str(tag_id)
     elif ip_ver.version == 6:
         url = 'https://[' + smc_host + ']/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/' + str(tag_id)
-    response = api_session.request("GET", url, verify=False)
-    tag_details = json.loads(response.content)["data"]
+    try:
+        response = api_session.request("GET", url, verify=False)
+        if response.status_code == 200:
+            tag_details = json.loads(response.content)["data"]
 
-    # Modify the details of thee given tag (host group) from the SMC
-    if isinstance(ip_range,str):
-        ip_range = ip_range.split(' ')
-    if ip_range is not None:
-        tag_details['ranges'].extend(ip_range)
-        tag_details['ranges'] = list(set(tag_details['ranges']))
-    coll_list.append(tag_details)
-    return coll_list
+        # Modify the details of thee given tag (host group) from the SMC
+            if isinstance(ip_range,str):
+                ip_range = ip_range.split(' ')
+            if ip_range is not None:
+                tag_details['ranges'].extend(ip_range)
+                tag_details['ranges'] = list(set(tag_details['ranges']))
+            coll_list.append(tag_details)
+            return coll_list
+        else:
+            print(f'Response Message: {json.loads(response.content)["errors"]}')
+            raise Exception(
+                "An error has occurred, while updating tags (host groups), with the following code {}".format(
+                    response.status_code))
+
+    except Exception as error:
+        logging.error(error)
 
 
 def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
@@ -300,7 +310,7 @@ def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
         all_tags = json.loads(response.content)
         for k,v in mapping.items():
             if result.get(k) is not None:
-                for i in range(8):  # Currently there are 9 valid host groups
+                for i in range(9):  # Currently there are 9 valid host groups
                     if v == all_tags["data"][i]["id"]:
                         mapped = [item for item in result[k] if item in all_tags["data"][i]["ranges"]]
                         if mapped:
