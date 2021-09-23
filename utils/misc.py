@@ -290,7 +290,7 @@ def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
         url = 'https://[' + smc_host + ']/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/'
     response = api_session.request("GET", url, verify=False)
     if response.status_code == 200:
-        print(f'Host group url {url} accessible for PUT operation')
+        print(f'{Style.GREEN}Host group url is accessible for for update operation{Style.RESET}')
     # Update the details of thee given tag (host group) in the SMC
 
     request_headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
@@ -304,8 +304,8 @@ def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
                     if v == all_tags["data"][i]["id"]:
                         mapped = [item for item in result[k] if item in all_tags["data"][i]["ranges"]]
                         if mapped:
-                            print(f"{Style.GREEN}IP address/range {Style.YELLOW}{result[k]}{Style.GREEN}"
-                                  f" successfully added to the smc host group {Style.YELLOW}{v} {Style.RESET}")
+                            print(f"{Style.GREEN}Data successfully posted to the smc host group: {Style.YELLOW}{v} "
+                                  f"{Style.RESET}")
                             break
         print(f"{Style.GREEN}Thank you for executing the script{Style.RESET}")
         with open(file_path, "w") as f:
