@@ -140,8 +140,8 @@ def check_post_status(func):
         if os.environ.get("stealth_watch_post", '0') == '0':
             func(*args, **kwargs)
         else:
-            print(f"smc.setting is already posted to stealthwatch so skipping the operation"
-                  f" for function {func.__qualname__}")
+            print(f"{Style.RED}smc.setting file data is already posted to smc server, so skipping the operation"
+                  f" for function {func.__qualname__}{Style.RESET}")
 
     return wrapper
 
@@ -188,16 +188,18 @@ def post_settings(result: dict):
                     result["username"] = username
                     result["password"] = password
                 except Exception as error:
+                    is_answer = False
                     logging.error(error)
                     print(f'{Style.RED}Please enter the ip in the correct format {Style.RESET}')
-                try:
-                    post_tag_details(result)
-                except Exception as error:
-                    logging.error(error)
-                    print(f'{Style.RED}Please check the api parameters for smc updation {Style.RESET}')
+                if is_answer:
+                    try:
+                        post_tag_details(result)
+                    except Exception as error:
+                        logging.error(error)
+                        print(f'{Style.RED}Please check the api parameters and execute script again to post to smc {Style.RESET}')
             else:
                 is_answer = True
-                print(f'{Style.GREEN}Thank you for executing the script{Style.RESET}')
+                print(f'{Style.GREEN}Thank you for executing the script. Please execute again to post to smc{Style.RESET}')
 
 
 def get_tenant_id(api_session, host):
@@ -235,7 +237,7 @@ def get_tenant_id(api_session, host):
             response.status_code))
 
 
-def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
+def get_tag_append(api_session, smc_host, smc_tenant_id, tag_id, ip_range, coll_list):
     """
 
     Args:
@@ -244,9 +246,10 @@ def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
         smc_tenant_id:Int: Tenant id fetched for the authentic connection
         tag_id: Int: Tag id for the host groups
         ip_range:List: List of ip addresses in the result dictionary for each host group
+        coll_list: List of tag details for all host groups
 
     Returns:
-
+        coll_list: List of tag details for all host groups
     """
     # Get the details of a given tag (host group) from the SMC
     ip_ver = ipaddress.ip_address(smc_host)
@@ -263,20 +266,55 @@ def update_tag(api_session, smc_host, smc_tenant_id, tag_id, ip_range):
     if ip_range is not None:
         tag_details['ranges'].extend(ip_range)
         tag_details['ranges'] = list(set(tag_details['ranges']))
+    coll_list.append(tag_details)
+    return coll_list
 
+
+def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
+    """
+
+    Args:
+        api_session: Valid api session
+        smc_host: String: smc host address
+        smc_tenant_id:Int: Tenant id fetched for the authentic connection
+        coll_list: List of tag details for all host groups
+
+    Returns:
+
+    """
+    # Get the details of a given tag (host group) from the SMC
+    ip_ver = ipaddress.ip_address(smc_host)
+    if ip_ver.version == 4:
+        url = 'https://' + smc_host + '/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/'
+    elif ip_ver.version == 6:
+        url = 'https://[' + smc_host + ']/smc-configuration/rest/v1/tenants/' + str(smc_tenant_id) + '/tags/'
+    response = api_session.request("GET", url, verify=False)
+    if response.status_code == 200:
+        print(f'Host group url {url} accessible for PUT operation')
     # Update the details of thee given tag (host group) in the SMC
+
     request_headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
-    response = api_session.request("PUT", url, verify=False, data=json.dumps(tag_details), headers=request_headers)
+    response = api_session.request("PUT", url, verify=False, data=json.dumps(coll_list), headers=request_headers)
     # If successfully able to update the tag (host group)
     if response.status_code == 200:
-        matches = [item for item in ip_range if item in json.loads(response.content)["data"]["ranges"]]
-        if ip_range is not None and matches:
-            print(f"{Style.GREEN}IP address/range successfully added to the tag: {Style.YELLOW}{tag_id}{Style.RESET}")
+        all_tags = json.loads(response.content)
+        for k,v in mapping.items():
+            if result.get(k) is not None:
+                for i in range(8):  # Currently there are 9 valid host groups
+                    if v == all_tags["data"][i]["id"]:
+                        mapped = [item for item in result[k] if item in all_tags["data"][i]["ranges"]]
+                        if mapped:
+                            print(f"{Style.GREEN}IP address/range {Style.YELLOW}{result[k]}{Style.GREEN}"
+                                  f" successfully added to the smc host group {Style.YELLOW}{v} {Style.RESET}")
+                            break
+        print(f"{Style.GREEN}Thank you for executing the script{Style.RESET}")
+        with open(file_path, "w") as f:
+            f.write("1")  # to indicate we already posted smc.settings
 
     # If unable to update the IPs for a given tag (host group)
     else:
-        print('Response: ', response.content)
-        raise Exception("An error has ocurred, while updating tags (host groups), with the following code {}".format(
+        print(f'Response Message: {json.loads(response.content)["errors"]}')
+        raise Exception("An error has occurred, while updating tags (host groups), with the following code {}".format(
             response.status_code))
 
 
@@ -313,12 +351,13 @@ def post_tag_details(result: Dict):
             if response.cookies.get('XSRF-TOKEN') is not None:
                 api_session.headers.update({'X-XSRF-TOKEN': response.cookies.get('XSRF-TOKEN')})
                 tenant_id = get_tenant_id(api_session, result["smc_ip_address"])  # get a tenant id
+                coll_list = list()
                 for key, value in result.items():
                     if key in mapping:  # if the result dict have matching tag id we will proceed to update the tag
-                        update_tag(api_session, result["smc_ip_address"], tenant_id, mapping[key], value)
-                    # Any new host group introduced should be added to the mapping dictionary
-                with open(file_path, "w") as f:
-                    f.write("1")  # to indicate we already posted smc.settings
+                        get_tag_append(api_session, result["smc_ip_address"], tenant_id, mapping[key], value, coll_list)
+                # Any new host group introduced should be added to the mapping dictionary
+                update_tag(api_session, result["smc_ip_address"], tenant_id, coll_list, result)
+
             else:
                 raise HTTPError('XSRF-TOKEN is missing in cookie')
         else:

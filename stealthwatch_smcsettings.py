@@ -76,7 +76,6 @@ def main():
     else:
         print_settings_first()  # Print welcome message for first time user
         run_all(result)
-        print(f'{Style.GREEN}Script Completed Successfully{Style.RESET}')
 
 
 if __name__ == '__main__':

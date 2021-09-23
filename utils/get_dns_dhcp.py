@@ -202,11 +202,14 @@ def get_internal_dhcp(result):
                         is_internal = False
                         while not is_internal:
                             add_dhcp = input(
-                                "Enter any additional DHCP SERVER IP address(s) comma separated:\n").strip()
+                                "Enter any additional DHCP SERVER IP address(s) comma separated or 's' to skip :\n").strip()
 
                             if len(add_dhcp) > 0:
-                                result, is_internal = ip_validation('ADDITIONAL DHCP_SERVER', add_dhcp, result,
-                                                                    is_internal)
+                                if add_dhcp == 's':
+                                    break
+                                else:
+                                    result, is_internal = ip_validation('ADDITIONAL DHCP_SERVER', add_dhcp, result,
+                                                                        is_internal)
                 if company_dhcp == 'n':
                     is_internal = False
                     while not is_internal:
