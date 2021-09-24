@@ -18,7 +18,7 @@
 
 import datetime
 import logging
-from .misc import case_check, ip_validation
+from .misc import case_check, ip_validation, cidr_ip_validation
 
 
 def capture_company_info(result):
@@ -64,7 +64,7 @@ def capture_company_info(result):
              "sensitive or CRITICAL SERVERS that if compromised would impact business operations\n"
              "(e.g. PCI servers or source code servers ) 's' to skip.\n"))
         if critical_subnet.lower() != 's':
-            result, is_internal = ip_validation('CRITICAL_RANGE', critical_subnet, result, is_internal)
+            result, is_internal = cidr_ip_validation('CRITICAL_RANGE', critical_subnet, result, is_internal)
         else:
             result["critical_subnet_flag"] = 's'
             logging.info("CRITICAL_RANGE option skipped by user")

@@ -130,7 +130,7 @@ def get_public_cidr(result: dict):
 
             is_answer = True
             if user_input == "y":
-                result["PUBLIC_RANGE"] = cidr.split(",")
+                result["PUBLIC_RANGE"] = [s.strip() for s in cidr.split(",")]
 
                 y_or_n = yn_check(types='PUBLIC RANGE')
                 if y_or_n == 'y':

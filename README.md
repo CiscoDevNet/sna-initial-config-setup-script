@@ -37,12 +37,11 @@ In Windows
  C:\> python3 -m venv test
  C:\> test\Scripts\activate.bat
 ```
-To install the other dependencies, execute:
+# Execution:
+To install the project dependencies, execute:
 ```
 pip install -r requirements.txt
 ```
-# Execution:
-
 Script can be executed via OS terminals or IDE terminals(eg: Pycharm or vscode). 
 The command to execute the script would be
 ```

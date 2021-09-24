@@ -28,6 +28,7 @@ import ipaddress
 import pathlib
 from typing import Dict
 
+import netaddr
 import requests
 from requests import HTTPError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -443,7 +444,8 @@ def run_subprocess_command(cmd: str):
 
 def ip_validation(reference: str, user_input: str, result: dict, is_internal: bool):
     """
-    Function to validate the ip address. Used to validate NAT_GATEWAY, INTERNAL_DNS, EXTERNAL_DNS, DHCP_SERVER
+    Function to validate the ip address. Used to validate NAT_GATEWAY, INTERNAL_DNS, EXTERNAL_DNS, DHCP_SERVER,
+    DOMAIN_CONTROLLER, EMAIL_SERVERS
     Args:
         reference(str): The input type in string format
         user_input(str): Console input entered by the user. comma separated string
@@ -473,8 +475,7 @@ def ip_validation(reference: str, user_input: str, result: dict, is_internal: bo
                          'EXTERNAL_DNS': 'EXTERNAL_DNS',
                          'DHCP_SERVER': 'DHCP_SERVER',
                          'DOMAIN_CONTROLLER': 'DOMAIN_CONTROLLER',
-                         'EMAIL_SERVERS': 'EMAIL_SERVERS',
-                         'CRITICAL_RANGE': 'CRITICAL_RANGE'}
+                         'EMAIL_SERVERS': 'EMAIL_SERVERS'}
             if reference in ('ADDITIONAL NAT_GATEWAY', 'ADDITIONAL INTERNAL_DNS', 'ADDITIONAL DHCP_SERVER'):
                 result[value_map[reference]].extend(stripped_list)
             else:
@@ -489,7 +490,7 @@ def ip_validation(reference: str, user_input: str, result: dict, is_internal: bo
 def cidr_ip_validation(reference: str, user_input: str, result: dict, is_internal: bool):
     """
     Function to validate the ip address and subnet mask when added via cidr format. Used to validate
-    PUBLIC_RANGE and ENDUSER_RANGE
+    PUBLIC_RANGE , CRITICAL_RANGE and ENDUSER_RANGE
     Args:
         reference(str): The input type in string format
         user_input(str): Console input entered by the user. comma separated string
@@ -506,17 +507,30 @@ def cidr_ip_validation(reference: str, user_input: str, result: dict, is_interna
         stripped_list = [s.strip() for s in internal_list]
         valid_mask = 'y'
         try:
-            for ele in stripped_list:
+            for ind, ele in enumerate(stripped_list):
                 if ele == '':
                     stripped_list.remove(ele)
                 else:
                     ip_value = ele.split("/", 1)[0].strip()
                     ipaddress.ip_address(ip_value)
-                    mask = ele.split("/", 1)[1].strip()
-                    if not 0 < int(mask) <= 32:
+                    if reference == 'CRITICAL_RANGE' and "/" not in ele:
+                        print(f'{Style.CYAN}{Style.UNDERLINE}Note:{Style.RESET} {Style.CYAN}For single ip address inputs'
+                              f' please enter /32 as the subnet mask value{Style.RESET}')
                         valid_mask = 'n'
-                        print(f'Invalid subnet mask value entered in CIDR format of IP address')
-
+                    else:
+                        mask = ele.split("/", 1)[1].strip()
+                        if not 0 < int(mask) <= 32:
+                            valid_mask = 'n'
+                            print(f'{Style.RED}Invalid subnet mask value entered in CIDR format of IP address{Style.RESET}')
+                    if valid_mask != 'n' and reference != 'CRITICAL_RANGE':
+                        ele = str(netaddr.IPNetwork('%s/%s' % (ip_value, mask)))
+                        ipaddr = ele.split('/')  # when connect to VPN  we get IP/32 so changing
+                        # address last digit to 0 and change 32 to 24
+                        if ipaddr[1] == '32':
+                            tmp = ipaddr[0].split('.')
+                            tmp[3] = '0'
+                            ele = f"{'.'.join(tmp)}/24"
+                            stripped_list[ind] = ele
             if valid_mask != 'n':
                 is_internal = True
                 if reference in ['ENDUSER_RANGE']:
@@ -525,6 +539,8 @@ def cidr_ip_validation(reference: str, user_input: str, result: dict, is_interna
                     result['PUBLIC_RANGE'].extend(stripped_list)
                 elif reference in ['PUBLIC_RANGE']:
                     result['PUBLIC_RANGE'] = stripped_list
+                elif reference in ['CRITICAL_RANGE']:
+                    result['CRITICAL_RANGE'] = stripped_list
 
         except Exception as error:
             logging.error(error)
@@ -586,7 +602,8 @@ def edit_smc_settings(result):
                       f'{Style.RESET}')
                 print(f'{Style.YELLOW}Warning: Please note the edit option will replace the current values with '
                       f'updated values and not append to the end{Style.RESET}')
-                if host_groups.get(host_index) == 'PUBLIC_RANGE' or host_groups.get(host_index) == 'ENDUSER_RANGE':
+                if host_groups.get(host_index) == 'PUBLIC_RANGE' or host_groups.get(host_index) == 'ENDUSER_RANGE'\
+                        or host_groups.get(host_index) == 'CRITICAL_RANGE':
                     get_input_cidr(host_index, host_groups, result)
                 else:
                     get_input_idr(host_index, host_groups, result)
@@ -654,13 +671,32 @@ def get_input_cidr(host_index, host_groups, result):
         is_internal = False
         parameter = host_groups.get(host_index)
         while not is_internal:
-            cidr_input = input(
-                "Enter the IP address(s) owned by your company in CIDR format comma separated or 's' to "
-                "exit without changes:\n").strip()
-            if cidr_input == 's':
-                is_internal = True
-            elif len(cidr_input) > 0:
-                result, is_internal = cidr_ip_validation(parameter, cidr_input, result, is_internal)
+            if parameter == 'CRITICAL_RANGE':
+                cidr_input = input(
+                    "Enter the IP address(s) owned by your company in CIDR format comma separated or 'r' to "
+                    "reset to None or 's' to exit without changes:\n").strip()
+            else:
+                cidr_input = input(
+                    "Enter the IP address(s) owned by your company in CIDR format comma separated or 's' to "
+                    "exit without changes:\n").strip()
+            if parameter == 'CRITICAL_RANGE':
+                if cidr_input == 'r':
+                    if result.get(parameter):
+                        result[parameter] = None
+                        is_internal = True
+                    elif result.get(parameter) is None:
+                        print(f'{Style.RED}This field is already empty. Please validate your input once again{Style.RESET}')
+                        is_internal = True
+                elif cidr_input == 's':
+                    is_internal = True
+                elif len(cidr_input) > 0:
+                    result, is_internal = cidr_ip_validation(parameter, cidr_input, result, is_internal)
+            else:
+                if cidr_input == 's':
+                    is_internal = True
+                elif len(cidr_input) > 0:
+                    result, is_internal = cidr_ip_validation(parameter, cidr_input, result, is_internal)
+
     except Exception as error:
         logging.error(error)
 
