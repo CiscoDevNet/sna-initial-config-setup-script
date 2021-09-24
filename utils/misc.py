@@ -42,6 +42,7 @@ base_dir = os.path.join(os.path.dirname(__file__), '..')
 file_path = os.path.join(base_dir, '.result')
 print(file_path)
 
+
 class Style:
     BLACK = '\033[30m'
     RED = '\033[31m'
@@ -140,8 +141,9 @@ def check_post_status(func):
         if os.environ.get("stealth_watch_post", '0') == '0':
             func(*args, **kwargs)
         else:
-            print(f"{Style.RED}smc.setting file data is already posted to smc server, so skipping the operation"
-                  f" for function {func.__qualname__}{Style.RESET}")
+            print(f"{Style.RED}smc.setting file data is already posted to smc server from this machine,"
+                  f" so skipping the operation for function {func.__qualname__}{Style.RESET}")
+            print(f'{Style.GREEN}Thank you!{Style.RESET}')
 
     return wrapper
 
@@ -157,13 +159,12 @@ def write_file(result, smc_path: str):
     try:
         with codecs.open(os.path.join(smc_path, 'smc.settings'), 'w', encoding='utf-8') as fp:
             json.dump(result, fp, indent=2)
-            logging.info('[%s] - Successfully created the settings file in [%s].', datetime.datetime.today(),
+            logging.info('[%s] - Successfully added to the smc.settings file in [%s].', datetime.datetime.today(),
                          str(smc_path))
     except Exception as error:
         logging.error(error)
 
 
-# TODO take care of this comment :Once the SMC is reachable, the script will post the setting via API
 @check_post_status
 def post_settings(result: dict):
     """
@@ -212,6 +213,7 @@ def get_tenant_id(api_session, host):
     Returns:
         smc_tenant_id: Int: Valid smc_tenant_id
     """
+    logging.info('[%s] - getting the domain/tenant id information.', datetime.datetime.today())
     # Get the list of tenants (domains) from the SMC
     ip_ver = ipaddress.ip_address(host)
     if ip_ver.version == 4:
@@ -292,6 +294,7 @@ def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
     Returns:
 
     """
+    logging.info('[%s] - post all the ip data to smc server.', datetime.datetime.today())
     # Get the details of a given tag (host group) from the SMC
     ip_ver = ipaddress.ip_address(smc_host)
     if ip_ver.version == 4:
@@ -308,18 +311,20 @@ def update_tag(api_session, smc_host, smc_tenant_id, coll_list, result):
     # If successfully able to update the tag (host group)
     if response.status_code == 200:
         all_tags = json.loads(response.content)
+        hgs = set()
         for k,v in mapping.items():
             if result.get(k) is not None:
                 for i in range(9):  # Currently there are 9 valid host groups
                     if v == all_tags["data"][i]["id"]:
                         mapped = [item for item in result[k] if item in all_tags["data"][i]["ranges"]]
                         if mapped:
-                            print(f"{Style.GREEN}Data successfully posted to the smc host group: {Style.YELLOW}{v} "
-                                  f"{Style.RESET}")
+                            hgs.add(v)
                             break
-        print(f"{Style.GREEN}Thank you for executing the script{Style.RESET}")
+        print(f"{Style.GREEN}Data has been successfully posted to following host groups: "
+              f"{Style.YELLOW}{hgs}{Style.GREEN} from this machine.{Style.RESET}")
         with open(file_path, "w") as f:
             f.write("1")  # to indicate we already posted smc.settings
+        print(f"{Style.GREEN}Thank you for executing the script !{Style.RESET}")
 
     # If unable to update the IPs for a given tag (host group)
     else:
@@ -337,6 +342,7 @@ def post_tag_details(result: Dict):
     Returns:
 
     """
+    logging.info('[%s] - start of workflow to post to smc server.', datetime.datetime.today())
     # Set the URL for SMC login
     ip_ver = ipaddress.ip_address(result["smc_ip_address"])
     if ip_ver.version == 4:

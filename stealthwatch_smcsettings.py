@@ -35,9 +35,6 @@ IP_REGX = re.compile("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-
 smc_path = str(pathlib.Path.home())
 
 
-# TODO user can configure the smc.settings file path via os environment variable or maybe simply via sys.argv?
-
-
 def run_all(result: Dict):
     """
     Runs the full set of functions to collect the network parameters

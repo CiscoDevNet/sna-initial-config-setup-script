@@ -8,7 +8,10 @@ Script works with Stealthwatch version 7.3.0 or higher
 Script is currently built to be executed on Mac, Windows and Linux operating systems.
 It is recommended to run the script in a virtual environment. create virtual environment by running the following command
 ```
-python3 -m venv 
+Use 
+python -m venv envname # If there is only one version of python in the machine 
+python3 -m venv envname # multiple python versions in machine and to choose python3 interpreter
+python3.x -m venv envname # multiple python3 versions in machine and choose python3.x interpreter
 ```
 Then based on the platform activate the venv by platform specific  command
 
@@ -28,6 +31,11 @@ In Mac/Linux
 ```
  python3 -m venv test
  source test/bin/activate
+```
+In Windows
+```
+ C:\> python3 -m venv test
+ C:\> test\Scripts\activate.bat
 ```
 To install the other dependencies, execute:
 ```

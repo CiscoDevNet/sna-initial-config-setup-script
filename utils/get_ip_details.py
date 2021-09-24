@@ -208,7 +208,6 @@ def get_linux_nic_name():
         print(str(e))
 
 
-# TODO route command takes too much time to execute
 def get_mac_nic_name():
     """
         Function to determine the current network interface name in mac machine
