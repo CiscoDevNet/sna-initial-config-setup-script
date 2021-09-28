@@ -3,7 +3,7 @@ Cisco Stealthwatch SMC server console.
 
 # Dependencies:
 To successfully execute this script, it requires [Python 3.9 version or higher](https://www.python.org/downloads/release/python-390/).
-Script works with Stealthwatch version 7.3.0 or higher
+Script works with Stealthwatch version 7.3.2 or higher
 
 Script is currently built to be executed on Mac, Windows and Linux operating systems.
 It is recommended to run the script in a virtual environment. create virtual environment by running the following command
@@ -32,10 +32,15 @@ In Mac/Linux
  python3 -m venv test
  source test/bin/activate
 ```
-In Windows
+In Windows Terminal
 ```
  C:\> python3 -m venv test
  C:\> test\Scripts\activate.bat
+ ```
+In Windows Powershell
+```
+ C:\> python3 -m venv test
+ C:\> test\Scripts\activate.ps1
 ```
 # Execution:
 To install the project dependencies, execute:
@@ -45,12 +50,11 @@ pip install -r requirements.txt
 Script can be executed via OS terminals or IDE terminals(eg: Pycharm or vscode). 
 The command to execute the script would be
 ```
-python cisco_stealth_watch\stealthwatch_settings.py
+python stealthwatch_settings.py
 ```
 ####Warning: 
 Since script relies on getpass python function when executed within IDLE you may get warning while entering 
 password so its recommended running via OS terminal rather than via any IDLE
-
 
 
 # Script details:

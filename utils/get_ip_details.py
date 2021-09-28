@@ -51,50 +51,63 @@ def get_public_ips(result: dict):
     """
     logging.info('[%s] - API calls to retrieve public IP address.', datetime.datetime.today())
     print(f'{Style.GREEN}Gathering your public IP from http://diagnostic.opendns.com/myip{Style.RESET}')
+    external_ip = None
     try:
-        response = requests.get(url="http://diagnostic.opendns.com/myip",verify=False)
+        response = requests.get(url="http://diagnostic.opendns.com/myip", verify=False)
         external_ip = response.content.decode('utf-8', '')
         external_ip_list = list()
         external_ip_list.append(external_ip)
 
     except Exception as error:
-        print(f"Received the following {error} error")
+        external_ip = None
+        print(f"{Style.RED}Received the following error when retrieving public ip : {error}{Style.RESET}")
         logging.error(error)
 
     result['NAT_GATEWAY'] = list()
     result['nat_gateway_flag'] = 'y'
     result['public_range_flag'] = 'y'
-    is_answer = False
-    while not is_answer:
-        response = case_check(input(f"Is {Style.CYAN}{external_ip}{Style.RESET} your company's NAT GATEWAY? y or n:\n"))
-        if response in ["y", "n"]:
+    if external_ip is None:
+        result['nat_gateway_flag'] = 'n'
+        is_internal = False
+        while not is_internal:
+            gateway = \
+                case_check(
+                    input("Please enter company's NAT GATEWAY IP address(s) comma separated:\n"
+                          "Note: CIDR range would be calculated for the first IP address in the list\n"))
 
-            is_answer = True
+            result, is_internal = ip_validation('NAT_GATEWAY', gateway, result, is_internal)
+    else:
+        is_answer = False
+        while not is_answer:
+            response = case_check(input(f"Is {Style.CYAN}{external_ip}{Style.RESET} your company's NAT GATEWAY? y or n:\n"))
+            if response in ["y", "n"]:
 
-            if response == "y":
-                result["NAT_GATEWAY"] = external_ip_list
+                is_answer = True
 
-                y_or_n = yn_check(types='NAT GATEWAY')
+                if response == "y":
+                    result["NAT_GATEWAY"] = external_ip_list
 
-                if y_or_n == 'y':
+                    y_or_n = yn_check(types='NAT GATEWAY')
+
+                    if y_or_n == 'y':
+                        is_internal = False
+                        while not is_internal:
+                            add_gateway = \
+                                case_check(
+                                    input("Please enter any additional NAT GATEWAY IP address(s) comma separated:\n"))
+                            result, is_internal = ip_validation('ADDITIONAL NAT_GATEWAY', add_gateway, result, is_internal)
+                else:
+                    result['nat_gateway_flag'] = 'n'
                     is_internal = False
                     while not is_internal:
-                        add_gateway = \
+                        gateway = \
                             case_check(
-                                input("Please enter any additional NAT GATEWAY IP address(s) comma separated:\n"))
-                        result, is_internal = ip_validation('ADDITIONAL NAT_GATEWAY', add_gateway, result, is_internal)
-            else:
-                result['nat_gateway_flag'] = 'n'
-                is_internal = False
-                while not is_internal:
-                    gateway = \
-                        case_check(
-                            input("Please enter company's NAT GATEWAY IP address(s) comma separated:\n"
-                                  "Note: CIDR range would be calculated for the first IP address in the list\n"))
+                                input("Please enter company's NAT GATEWAY IP address(s) comma separated:\n"
+                                      "Note: CIDR range would be calculated for the first IP address in the list\n"))
 
-                    result, is_internal = ip_validation('NAT_GATEWAY', gateway, result, is_internal)
-        else:
-            print(f'{Style.RED}Wrong value! Please input y or n{Style.RESET}')
+                        result, is_internal = ip_validation('NAT_GATEWAY', gateway, result, is_internal)
+            else:
+                print(f'{Style.RED}Wrong value! Please input y or n{Style.RESET}')
     return result
 
 
@@ -116,45 +129,57 @@ def get_public_cidr(result: dict):
           f'{Style.GREEN}to find CIDR block.{Style.RESET}')
     try:
         cidr = whois_ip(result["NAT_GATEWAY"][0])
-
+        cidr = cidr.replace(" ", "")
     except Exception as error:
+        cidr = ''
+        print(f"{Style.RED}Received the following error when retrieving public range : {error}{Style.RESET}")
         logging.error(error)
 
-    is_answer = False
-    while not is_answer:
+    if cidr == '':
+        result['public_range_flag'] = 'n'
+        is_internal = False
+        while not is_internal:
+            valid_cidr = \
+                input("Enter the PUBLIC RANGE IP address(s) owned by your company in CIDR format "
+                      "comma separated:\n").strip()
+            if len(valid_cidr) > 0:
+                result, is_internal = cidr_ip_validation('PUBLIC_RANGE', valid_cidr, result, is_internal)
+    else:
+        is_answer = False
+        while not is_answer:
 
-        user_input = case_check(input(f"Is this full network {Style.CYAN}{cidr}{Style.RESET} "
-                                      f"registered to your company? y or n \n"))
+            user_input = case_check(input(f"Is this full network {Style.CYAN}{cidr}{Style.RESET} "
+                                          f"registered to your company? y or n \n"))
 
-        if user_input in ['y', 'n']:
+            if user_input in ['y', 'n']:
 
-            is_answer = True
-            if user_input == "y":
-                result["PUBLIC_RANGE"] = [s.strip() for s in cidr.split(",")]
+                is_answer = True
+                if user_input == "y":
+                    result["PUBLIC_RANGE"] = [s.strip() for s in cidr.split(",")]
 
-                y_or_n = yn_check(types='PUBLIC RANGE')
-                if y_or_n == 'y':
+                    y_or_n = yn_check(types='PUBLIC RANGE')
+                    if y_or_n == 'y':
+                        is_internal = False
+                        while not is_internal:
+                            additional_cidr = input(
+                                "Enter any additional PUBLIC RANGE IP address(s) owned by your company in CIDR format "
+                                "comma separated:\n").strip()
+                            if len(additional_cidr) > 0:
+                                result, is_internal = cidr_ip_validation('ADDITIONAL PUBLIC_RANGE', additional_cidr, result,
+                                                                         is_internal)
+
+                if user_input == "n":
+                    result['public_range_flag'] = 'n'
                     is_internal = False
                     while not is_internal:
-                        additional_cidr = input(
-                            "Enter any additional PUBLIC RANGE IP address(s) owned by your company in CIDR format "
-                            "comma separated:\n").strip()
-                        if len(additional_cidr) > 0:
-                            result, is_internal = cidr_ip_validation('ADDITIONAL PUBLIC_RANGE', additional_cidr, result,
-                                                                     is_internal)
+                        valid_cidr = \
+                            input("Enter the PUBLIC RANGE IP address(s) owned by your company in CIDR format "
+                                  "comma separated:\n").strip()
+                        if len(valid_cidr) > 0:
+                            result, is_internal = cidr_ip_validation('PUBLIC_RANGE', valid_cidr, result, is_internal)
 
-            if user_input == "n":
-
-                is_internal = False
-                while not is_internal:
-                    valid_cidr = \
-                        input("Enter the PUBLIC RANGE IP address(s) owned by your company in CIDR format "
-                              "comma separated:\n").strip()
-                    if len(valid_cidr) > 0:
-                        result, is_internal = cidr_ip_validation('PUBLIC_RANGE', valid_cidr, result, is_internal)
-
-        else:
-            print(f'{Style.RED}Wrong value! Please input y or n{Style.RESET}')
+            else:
+                print(f'{Style.RED}Wrong value! Please input y or n{Style.RESET}')
 
     return result  # get_ip_details
 

@@ -544,7 +544,7 @@ def cidr_ip_validation(reference: str, user_input: str, result: dict, is_interna
 
         except Exception as error:
             logging.error(error)
-            print(f'Please check if the CIDR format of IP address(s) entered is valid')
+            print(f'{Style.RED}Please check if the CIDR format of IP address(s) entered is valid{Style.RESET}')
         return result, is_internal
 
 
