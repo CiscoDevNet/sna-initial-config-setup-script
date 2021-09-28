@@ -1,4 +1,4 @@
-# System Requirements: Stealthwatch Version: 7.3.0 or higher
+# System Requirements: Stealthwatch Version: 7.3.2 or higher
 #
 # Copyright (c) 2021, Cisco Systems, Inc. All rights reserved.
 # Permission is hereby granted, free of charge, to any person obtaining a copy

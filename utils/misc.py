@@ -1,4 +1,4 @@
-# System Requirements: Stealthwatch Version: 7.3.0 or higher
+# System Requirements: Stealthwatch Version: 7.3.2 or higher
 #
 # Copyright (c) 2021, Cisco Systems, Inc. All rights reserved.
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -379,6 +379,11 @@ def post_tag_details(result: Dict):
                 raise HTTPError('XSRF-TOKEN is missing in cookie')
         else:
             raise HTTPError(f"api returned with status code {response.status_code}")
+
+    except Exception as error:
+        print(f"{Style.RED}Received the following error when connecting to smc server: {error}{Style.RESET}")
+        logging.error(error)
+
     finally:
         if api_session:
             api_session.close()
