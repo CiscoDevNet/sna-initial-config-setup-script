@@ -75,3 +75,6 @@ Script generates three files
 2. smc.log file which has the log information of the execution.
 3. .result file to record if the script data is already posted to smc server.
     if the .result file has a value of 1, that identifies the machine has already posted to smc.
+
+## Licensing info
+This code is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) for details. 
